@@ -10,19 +10,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { db, storage } from "@/firebase"
 import { useAppStore } from "@/store/store"
-
-// const [ isDeleteModalOpen, setIsDeleteModalOpen, fileId, setFileId,] = 
-//   useAppStore(state => [
-//     state.isDeleteModalOpen,
-//     state.setIsDeleteModalOpen,
-//     state.fileId,
-//     state.setFileId,
-//   ])
-
-//   async function deleteFile() {}
+import { useUser } from "@clerk/nextjs"
+import { deleteDoc, doc } from "firebase/firestore"
+import { deleteObject, ref } from "firebase/storage"
+import toast from "react-hot-toast"
 
 export function DeleteModal() {
+    const { user } = useUser()
     const [ isDeleteModalOpen, setIsDeleteModalOpen, fileId, setFileId,] = 
   useAppStore(state => [
     state.isDeleteModalOpen,
@@ -31,7 +27,32 @@ export function DeleteModal() {
     state.setFileId,
   ])
 
-  async function deleteFile() {}
+  async function deleteFile() {
+    if(!user || !fileId ) return;
+
+    const toastId = toast.loading("Deleting...");
+
+    const fileRef = ref(storage, `users/${user.id}/files/${fileId}`);
+
+    try{
+        deleteObject(fileRef)
+        .then(async () => {    
+            deleteDoc(doc(db, 'users', user.id, 'files', fileId)).then(() => {
+                toast.success("File deleted successfully", {
+                    id: toastId,
+                });
+            });
+        }).finally(() => {
+        setIsDeleteModalOpen(false)
+    });
+    } catch(error){
+        setIsDeleteModalOpen(false)
+
+        toast.error("Failed to delete file", {
+            id: toastId,
+        });
+    }
+  }
   return (
     <Dialog
         open={isDeleteModalOpen}
@@ -60,6 +81,7 @@ export function DeleteModal() {
             <Button
                 type="submit"
                 size="sm"
+                variant={"destructive"}
                 className="px-3 flex-1"
                 onClick={() => deleteFile()}
             >
@@ -67,13 +89,6 @@ export function DeleteModal() {
                 <span>Delete</span>
             </Button>
         </div>
-        <DialogFooter className="sm:justify-start">
-          <DialogClose asChild>
-            <Button type="button" variant="secondary">
-              Close
-            </Button>
-          </DialogClose>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
